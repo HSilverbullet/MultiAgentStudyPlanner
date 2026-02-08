@@ -4,6 +4,8 @@ from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from .my_llm import llm1
 from langchain.agents import create_agent
+from langchain_mcp_adapters.client import MultiServerMCPClient
+from .config import TAVILY_API_KEY
 from .prompts import (
     DIAGNOSIS_AGENT_PROMPT,
     RESOURCE_AGENT_PROMPT,  
@@ -12,7 +14,6 @@ from .prompts import (
 )
 from .schemas import StudyRequest, StudyPlan, StudyPlanResponse
 # 资源检索工具：示例用 DuckDuckGo（不需要 key）
-# 如果你已有 MCP Web Search 工具，请看下面“如何替换成 MCP 搜索工具”
 try:
     from langchain_community.tools import DuckDuckGoSearchRun
 except Exception:
@@ -36,11 +37,38 @@ class MultiAgentStudyPlanner:
         """初始化多智能体系统"""
         print("初始化多智能体学习规划系统...")
 
-        # 资源检索工具：示例用 DuckDuckGo
-        if DuckDuckGoSearchRun is not None:
-            self.resource_tools = [DuckDuckGoSearchRun()]
+        
+        # # 资源检索工具：示例用 DuckDuckGo
+        # if DuckDuckGoSearchRun is not None:
+        #     self.resource_tools = [DuckDuckGoSearchRun()]
+        # else:
+        #     self.resource_tools = []
+        # -------------------------
+        # 资源检索工具：Tavily MCP（HTTP）
+        # -------------------------
+        self.resource_tools = []
+
+        if not TAVILY_API_KEY:
+            print("⚠️ 未设置环境变量 TAVILY_API_KEY，资源Agent将无联网搜索工具")
         else:
-            self.resource_tools = []
+            tavily_mcp_url = f"https://mcp.tavily.com/mcp/?tavilyApiKey={TAVILY_API_KEY}"
+
+            try:
+                self.mcp_client = MultiServerMCPClient(
+                    {
+                        "tavily": {
+                            "transport": "http",
+                            "url": tavily_mcp_url,
+                        }
+                    }
+                )
+
+                self.resource_tools = await self.mcp_client.get_tools()
+                print(f"✅ Tavily MCP tools loaded: {[t.name for t in self.resource_tools]}")
+            except Exception as e:
+                print(f"⚠️ Tavily MCP 连接失败: {e}")
+                self.resource_tools = []
+
 
         print("  - 创建学情诊断Agent...")
         self.diagnosis_agent = create_agent(
