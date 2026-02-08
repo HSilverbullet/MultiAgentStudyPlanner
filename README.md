@@ -48,7 +48,7 @@ OPENAI_API_KEY=your_openai_api_key_here
 启动 FastAPI 服务：
 
 ```bash
-uvicorn trip_planner.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn study.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### 4. 访问系统
